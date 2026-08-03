@@ -1,0 +1,3 @@
+insert into public.locations (name) values ('Gedung Utama'), ('Gudang'), ('Area Parkir'), ('Area Produksi') on conflict do nothing;
+insert into public.cause_categories (code, name) values ('NETWORK','Jaringan'), ('POWER','Listrik'), ('CAMERA','Kamera atau Perangkat'), ('NVR','NVR atau Penyimpanan'), ('MAINTENANCE','Maintenance Terencana'), ('ENVIRONMENT','Gangguan Lingkungan atau Fisik'), ('UNKNOWN','Belum Diketahui') on conflict do nothing;
+insert into public.devices (code,name,location_id,active_from) select 'CCTV-' || lpad(n::text,3,'0'), 'CCTV Contoh ' || n, l.id, current_date from generate_series(1,10) n cross join lateral (select id from public.locations order by name limit 1) l on conflict (code) do nothing;
