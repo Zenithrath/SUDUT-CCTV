@@ -4,6 +4,16 @@ import { IconCalendar, IconCheck, IconRotate } from "@tabler/icons-react";
 import { formatDuration } from "@/lib/duration";
 import { formatShortDate, MINUTES_PER_DAY, percent, type DailyRecord } from "@/lib/reports";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ReportFormProps = {
   devices: string[];
@@ -30,8 +40,7 @@ type ReportFormProps = {
   onReset: () => void;
 };
 
-const inputClass =
-  "h-10 w-full rounded-md border bg-white px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
+const dateInputClass = "[&::-webkit-calendar-picker-indicator]:opacity-60";
 
 export function ReportForm({
   devices,
@@ -62,128 +71,160 @@ export function ReportForm({
   const uptimePercent = (uptime / MINUTES_PER_DAY) * 100;
 
   return (
-    <section className="rounded-lg border bg-white p-5">
-      <h2 className="mb-4 text-sm font-semibold">Tambah laporan</h2>
+    <section className="rounded-lg border bg-card">
+      <div className="border-b px-5 py-4">
+        <h2 className="text-sm font-semibold">Tambah laporan</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Catat downtime harian per device
+        </p>
+      </div>
 
       <form
-        className="space-y-4"
+        className="space-y-4 px-5 py-4"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit();
         }}
         noValidate
       >
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground" htmlFor="device">
-            Device CCTV
-          </label>
-          <select
-            id="device"
-            value={device}
-            onChange={(event) => onDeviceChange(event.target.value)}
-            className={inputClass}
+        <div className="space-y-1.5">
+          <Select
+            selectedKey={device || null}
+            onSelectionChange={(key) => onDeviceChange(key ? String(key) : "")}
+            className="w-full"
           >
-            <option value="">Pilih device…</option>
-            {devices.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-            <option value="__new">Tambah device baru…</option>
-          </select>
+            <Label>Device CCTV</Label>
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {({ isPlaceholder, selectedText }) =>
+                  isPlaceholder ? "Pilih device…" : selectedText
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem id="__new" textValue="__new">Tambah device baru…</SelectItem>
+              {devices.map((name) => (
+                <SelectItem key={name} id={name} textValue={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {addingNew && (
-            <input
+            <Input
               value={newDevice}
               onChange={(event) => onNewDeviceChange(event.target.value)}
               placeholder="Nama device baru"
-              className={cn(inputClass, "mt-2")}
               autoFocus
             />
           )}
         </div>
 
-        <div>
-          <div className="mb-1.5 flex items-center justify-between">
-            <label className="text-xs font-medium text-muted-foreground">Tanggal</label>
-            <button
-              type="button"
-              onClick={() => onDateModeChange(dateMode === "single" ? "range" : "single")}
-              className="text-xs font-medium text-primary hover:underline"
-            >
-              {dateMode === "single" ? "Rentang tanggal →" : "← Satu tanggal"}
-            </button>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label>Tanggal</Label>
+            <div className="flex rounded-md border border-border bg-muted p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => onDateModeChange("single")}
+                className={cn(
+                  "rounded px-2 py-1 font-medium transition",
+                  dateMode === "single"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Satu tanggal
+              </button>
+              <button
+                type="button"
+                onClick={() => onDateModeChange("range")}
+                className={cn(
+                  "rounded px-2 py-1 font-medium transition",
+                  dateMode === "range"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Rentang
+              </button>
+            </div>
           </div>
 
           {dateMode === "single" ? (
             <div className="relative">
-              <IconCalendar className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input
+              <IconCalendar className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
                 type="date"
                 max={maxDate}
                 value={date}
                 onChange={(event) => onDateChange(event.target.value)}
-                className={cn(inputClass, "pl-9")}
+                className={cn("pl-9", dateInputClass)}
+                aria-label="Tanggal"
               />
             </div>
           ) : (
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-              <input
+            <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+              <Input
                 type="date"
                 max={maxDate}
                 value={date}
                 onChange={(event) => onDateChange(event.target.value)}
-                className={inputClass}
+                className={dateInputClass}
+                aria-label="Tanggal awal"
               />
-              <span className="text-xs text-muted-foreground">s/d</span>
-              <input
+              <span className="pb-2 text-xs text-muted-foreground">s/d</span>
+              <Input
                 type="date"
                 max={maxDate}
                 value={toDate}
                 onChange={(event) => onToDateChange(event.target.value)}
-                className={inputClass}
+                className={dateInputClass}
+                aria-label="Tanggal akhir"
               />
             </div>
           )}
         </div>
 
-        <fieldset>
-          <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Downtime</legend>
+        <div className="space-y-1.5">
+          <Label>Downtime</Label>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="sr-only" htmlFor="hours">Jam downtime</label>
-              <input
-                id="hours"
+            <div className="space-y-1">
+              <Input
                 type="number"
                 min="0"
                 max="24"
                 inputMode="numeric"
                 value={hours}
                 onChange={(event) => onHoursChange(event.target.value)}
-                className={inputClass}
+                aria-label="Jam downtime"
               />
-              <p className="mt-1 text-xs text-muted-foreground">jam</p>
+              <p className="text-xs text-muted-foreground">jam</p>
             </div>
-            <div>
-              <label className="sr-only" htmlFor="minutes">Menit downtime</label>
-              <input
-                id="minutes"
+            <div className="space-y-1">
+              <Input
                 type="number"
                 min="0"
                 max="59"
                 inputMode="numeric"
                 value={minutes}
                 onChange={(event) => onMinutesChange(event.target.value)}
-                className={inputClass}
+                aria-label="Menit downtime"
               />
-              <p className="mt-1 text-xs text-muted-foreground">menit</p>
+              <p className="text-xs text-muted-foreground">menit</p>
             </div>
           </div>
-        </fieldset>
+        </div>
 
-        <div className="space-y-2 rounded-md bg-muted/50 px-3 py-3 text-sm">
+        <div className="space-y-1.5 rounded-md bg-muted/60 px-3 py-2.5 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">Downtime</span>
-            <span className={cn("font-semibold tabular-nums", validDowntime ? "text-red-600" : "text-muted-foreground")}>
+            <span
+              className={cn(
+                "font-semibold tabular-nums",
+                validDowntime ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
               {validDowntime ? formatDuration(downtimeMinutes) : "—"}
             </span>
           </div>
@@ -195,41 +236,48 @@ export function ReportForm({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">Persentase</span>
-            <span className={cn("font-semibold tabular-nums", validDowntime && uptimePercent >= 99.9 ? "text-emerald-600" : "")}>
+            <span
+              className={cn(
+                "font-semibold tabular-nums",
+                validDowntime && uptimePercent >= 99.9 && "text-ok",
+              )}
+            >
               {validDowntime ? percent(uptimePercent) : "—"}
             </span>
           </div>
         </div>
 
         {existing && dateMode === "single" && (
-          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            Data {existing.device} untuk {formatShortDate(existing.date)} sudah ada (downtime{" "}
-            {formatDuration(existing.downtimeMinutes)}). Simpan untuk memperbarui.
+          <p className="rounded-md bg-warn/10 px-3 py-2 text-xs text-warn">
+            Data {existing.device} untuk {formatShortDate(existing.date)} sudah
+            ada (downtime {formatDuration(existing.downtimeMinutes)}). Simpan
+            untuk memperbarui.
           </p>
         )}
 
         {notice && (
-          <p role="status" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p
+            role="status"
+            className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
             {notice}
           </p>
         )}
 
         <div className="flex gap-2">
-          <button
-            type="submit"
-            className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <IconCheck className="size-4" />
+          <Button type="submit" className="flex-1">
+            <IconCheck />
             Simpan
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={onReset}
-            title="Reset form"
-            className="inline-flex h-10 items-center justify-center rounded-full border bg-white px-3 text-sm font-medium hover:bg-muted"
+            aria-label="Reset form"
           >
-            <IconRotate className="size-4" />
-          </button>
+            <IconRotate />
+          </Button>
         </div>
       </form>
     </section>

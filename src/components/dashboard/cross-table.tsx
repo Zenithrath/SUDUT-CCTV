@@ -3,139 +3,74 @@
 import { Fragment, useMemo } from "react";
 import { formatDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
-import type { DeviceSummary, FilterStatus } from "@/lib/reports";
+import { formatShortDate, MINUTES_PER_DAY, today, type DeviceSummary, type FilterStatus } from "@/lib/reports";
+import { IconTable } from "@tabler/icons-react";
 
 type CrossTableProps = {
   summaries: DeviceSummary[];
-  year: number;
-  month: number;
+  from: string;
+  to: string;
   filterStatus: FilterStatus;
 };
 
-function getDaysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate();
-}
-
-function formatDateLabel(dateStr: string) {
-  return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short" }).format(
-    new Date(`${dateStr}T00:00:00`),
-  );
-}
-
-function buildDateList(year: number, month: number) {
-  const days = getDaysInMonth(year, month);
+function buildDateList(from: string, to: string) {
   const result: string[] = [];
-  for (let d = 1; d <= days; d++) {
-    const m = String(month).padStart(2, "0");
-    const dd = String(d).padStart(2, "0");
-    result.push(`${year}-${m}-${dd}`);
+  const todayStr = today();
+  if (!from || !to || to < from || from > todayStr) return result;
+  const cursor = new Date(`${from}T00:00:00`);
+  const last = new Date(`${to}T00:00:00`);
+  while (cursor <= last) {
+    const y = cursor.getFullYear();
+    const m = String(cursor.getMonth() + 1).padStart(2, "0");
+    const d = String(cursor.getDate()).padStart(2, "0");
+    const key = `${y}-${m}-${d}`;
+    if (key > todayStr) break;
+    result.push(key);
+    cursor.setDate(cursor.getDate() + 1);
   }
   return result;
 }
 
-export function CrossTable({ summaries, year, month, filterStatus }: CrossTableProps) {
-  const allDates = useMemo(() => buildDateList(year, month), [year, month]);
+export function CrossTable({ summaries, from, to, filterStatus }: CrossTableProps) {
+  const allDates = useMemo(() => buildDateList(from, to), [from, to]);
+
   const activeDates = useMemo(() => {
-    if (filterStatus === "all") return allDates;
-    const datesWithData = new Set(summaries.flatMap((s) => s.records.map((r) => r.date)));
-    return allDates.filter((d) => datesWithData.has(d));
+    if (filterStatus === "downtime") {
+      const daysWithDowntime = new Set<string>();
+      for (const s of summaries) {
+        for (const r of s.records) {
+          if (r.downtimeMinutes > 0) daysWithDowntime.add(r.date);
+        }
+      }
+      return allDates.filter((d) => daysWithDowntime.has(d));
+    }
+    return allDates;
   }, [allDates, summaries, filterStatus]);
 
   const deviceRecords = useMemo(() => {
     const map = new Map<string, Map<string, number>>();
     for (const s of summaries) {
       const dateMap = new Map<string, number>();
-      for (const r of s.records) {
-        dateMap.set(r.date, r.downtimeMinutes);
-      }
+      for (const r of s.records) dateMap.set(r.date, r.downtimeMinutes);
       map.set(s.device, dateMap);
     }
     return map;
   }, [summaries]);
 
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr>
-            <th className="sticky left-0 z-10 border border-slate-200 bg-slate-100 px-3 py-2 text-left text-xs font-semibold text-slate-600">
-              Tanggal
-            </th>
-            {summaries.map((s) => (
-              <th
-                key={s.device}
-                colSpan={2}
-                className="border border-slate-200 bg-slate-100 px-3 py-2 text-center text-xs font-semibold text-slate-700"
-              >
-                {s.device.replace("CCTV ", "")}
-              </th>
-            ))}
-          </tr>
-          <tr>
-            <th className="sticky left-0 z-10 border border-slate-200 bg-slate-50" />
-            {summaries.map((s) => (
-              <Fragment key={s.device}>
-                <th className="border border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] font-semibold uppercase text-slate-500">
-                  Down
-                </th>
-                <th className="border border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] font-semibold uppercase text-slate-500">
-                  Up
-                </th>
-              </Fragment>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {activeDates.map((date) => (
-            <tr key={date}>
-              <td className="sticky left-0 z-10 border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">
-                {formatDateLabel(date)}
-              </td>
-              {summaries.map((s) => {
-                const dateMap = deviceRecords.get(s.device);
-                const hasData = dateMap?.has(date) ?? false;
-                const dt = dateMap?.get(date) ?? 0;
-                const ut = 1440 - dt;
-                return (
-                  <Fragment key={s.device}>
-                    <td
-                      className={cn(
-                        "border border-slate-200 px-2 py-1.5 text-center tabular-nums text-xs",
-                        hasData && dt > 0 ? "font-semibold text-red-600" : "text-slate-400",
-                      )}
-                    >
-                      {hasData ? formatDuration(dt) : "-"}
-                    </td>
-                    <td
-                      className={cn(
-                        "border border-slate-200 px-2 py-1.5 text-center tabular-nums text-xs",
-                        hasData ? "font-medium text-slate-700" : "text-slate-400",
-                      )}
-                    >
-                      {hasData ? formatDuration(ut) : "-"}
-                    </td>
-                  </Fragment>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+  const visibleDevices = summaries.filter((s) => s.days > 0);
 
-type DailyCrossTableProps = {
-  summaries: DeviceSummary[];
-};
-
-export function DailyCrossTable({ summaries }: DailyCrossTableProps) {
-  const allDates = [...new Set(summaries.flatMap((s) => s.records.map((r) => r.date)))].sort().reverse();
-
-  if (allDates.length === 0) {
+  if (visibleDevices.length === 0 || activeDates.length === 0) {
     return (
-      <div className="px-5 py-10 text-center text-sm text-muted-foreground">
-        Belum ada data. Input downtime lewat form.
+      <div className="flex flex-col items-center justify-center gap-2 px-5 py-12 text-center">
+        <IconTable className="size-8 text-muted-foreground/50" />
+        <p className="text-sm font-medium text-foreground">
+          {filterStatus === "downtime"
+            ? "Tidak ada downtime di periode ini"
+            : "Belum ada data di periode ini"}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Gunakan form di samping untuk input downtime, atau pilih periode lain.
+        </p>
       </div>
     );
   }
@@ -145,27 +80,27 @@ export function DailyCrossTable({ summaries }: DailyCrossTableProps) {
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            <th className="border border-slate-200 bg-slate-100 px-3 py-2 text-left text-xs font-semibold text-slate-600">
+            <th className="sticky left-0 z-10 border-r border-b bg-muted px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
               Tanggal
             </th>
-            {summaries.map((s) => (
+            {visibleDevices.map((s) => (
               <th
                 key={s.device}
                 colSpan={2}
-                className="border border-slate-200 bg-slate-100 px-3 py-2 text-center text-xs font-semibold text-slate-700"
+                className="border-b px-3 py-2 text-center text-xs font-semibold text-foreground"
               >
                 {s.device.replace("CCTV ", "")}
               </th>
             ))}
           </tr>
           <tr>
-            <th className="border border-slate-200 bg-slate-50" />
-            {summaries.map((s) => (
+            <th className="sticky left-0 z-10 border-r border-b bg-muted" />
+            {visibleDevices.map((s) => (
               <Fragment key={s.device}>
-                <th className="border border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] font-semibold uppercase text-slate-500">
+                <th className="border-b border-r px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">
                   Down
                 </th>
-                <th className="border border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] font-semibold uppercase text-slate-500">
+                <th className="border-b px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">
                   Up
                 </th>
               </Fragment>
@@ -173,25 +108,35 @@ export function DailyCrossTable({ summaries }: DailyCrossTableProps) {
           </tr>
         </thead>
         <tbody>
-          {allDates.map((date) => (
-            <tr key={date}>
-              <td className="border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
-                {new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short" }).format(new Date(`${date}T00:00:00`))}
+          {activeDates.map((date) => (
+            <tr key={date} className="group">
+              <td className="sticky left-0 z-10 border-r border-b bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                {formatShortDate(date)}
               </td>
-              {summaries.map((s) => {
-                const record = s.records.find((r) => r.date === date);
-                const dt = record?.downtimeMinutes ?? 0;
-                const ut = 1440 - dt;
+              {visibleDevices.map((s) => {
+                const dateMap = deviceRecords.get(s.device);
+                const hasData = dateMap?.has(date) ?? false;
+                const dt = dateMap?.get(date) ?? 0;
+                const ut = MINUTES_PER_DAY - dt;
                 return (
                   <Fragment key={s.device}>
-                    <td className={cn(
-                      "border border-slate-200 px-2 py-2 text-center tabular-nums",
-                      dt > 0 ? "font-medium text-red-600" : "text-slate-400",
-                    )}>
-                      {formatDuration(dt)}
+                    <td
+                      className={cn(
+                        "border-b border-r px-2 py-1.5 text-center text-xs tabular-nums",
+                        hasData && dt > 0
+                          ? "font-medium text-destructive"
+                          : "text-muted-foreground/60",
+                      )}
+                    >
+                      {hasData ? formatDuration(dt) : "-"}
                     </td>
-                    <td className="border border-slate-200 px-2 py-2 text-center tabular-nums font-medium text-slate-700">
-                      {formatDuration(ut)}
+                    <td
+                      className={cn(
+                        "border-b px-2 py-1.5 text-center text-xs tabular-nums",
+                        hasData ? "text-foreground" : "text-muted-foreground/60",
+                      )}
+                    >
+                      {hasData ? formatDuration(ut) : "-"}
                     </td>
                   </Fragment>
                 );

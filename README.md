@@ -15,9 +15,9 @@ Alurnya hanya tiga langkah:
 - Ringkasan per device: total uptime, total downtime, rata-rata per hari, persentase, dan status.
 - Klik baris device untuk melihat rincian laporan hariannya, termasuk hapus laporan.
 - Filter berdasarkan nama device, rentang tanggal, dan status; urutkan per nama atau downtime terbesar.
-- Ekspor data ke CSV.
+- Ekspor laporan ke Excel (`.xlsx`).
 - Jika device dan tanggal yang sama dimasukkan lagi, laporan sebelumnya diperbarui.
-- Data disimpan di local storage browser sehingga langsung bisa digunakan tanpa konfigurasi database.
+- Data disimpan di local storage browser sehingga langsung bisa digunakan tanpa konfigurasi database. Perubahan akan tersinkronisasi antar-tab pada browser yang sama, tetapi belum dibagikan otomatis ke komputer atau browser lain.
 
 ## Menjalankan aplikasi
 

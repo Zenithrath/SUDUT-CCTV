@@ -1,4 +1,5 @@
 import { formatDuration } from "@/lib/duration";
+import { loadDevices } from "@/lib/devices";
 
 export type DailyRecord = {
   id: string;
@@ -61,33 +62,46 @@ export function today() {
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 }
 
-export function backfillPastDates(
+function formatDateParts(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return { key: `${y}-${m}-${d}`, y, m, d };
+}
+
+export function backfillDateRange(
   records: DailyRecord[],
-  year: number,
-  month: number,
+  from: string,
+  to: string,
 ): DailyRecord[] {
   const todayStr = today();
-  const daysInMonth = new Date(year, month, 0).getDate();
+  const start = from && from < to ? from : to;
+  const end = to && to < todayStr ? to : todayStr;
+  if (!start || !end || end < start) return [...records];
+
   const result = [...records];
   const allDevices = allDeviceNames(records);
 
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    if (dateStr > todayStr) continue;
+  const cursor = new Date(`${start}T00:00:00`);
+  const last = new Date(`${end}T00:00:00`);
+
+  while (cursor <= last) {
+    const { key } = formatDateParts(cursor);
     for (const device of allDevices) {
-      const deviceHasRecord = result.some(
-        (r) => r.date === dateStr && r.device === device,
+      const hasRecord = result.some(
+        (r) => r.date === key && r.device === device,
       );
-      if (!deviceHasRecord) {
+      if (!hasRecord) {
         result.push({
-          id: `auto-${device}-${dateStr}`,
+          id: `auto-${device}-${key}`,
           device,
-          date: dateStr,
+          date: key,
           downtimeMinutes: 0,
           savedAt: "",
         });
       }
     }
+    cursor.setDate(cursor.getDate() + 1);
   }
   return result;
 }
@@ -114,7 +128,7 @@ export function safeRecords(value: string | null): DailyRecord[] {
 }
 
 export function allDeviceNames(records: DailyRecord[]): string[] {
-  const names = new Set(DEFAULT_DEVICES);
+  const names = new Set(loadDevices());
   for (const record of records) names.add(record.device);
   return [...names].sort((a, b) => a.localeCompare(b, "id"));
 }
@@ -162,9 +176,10 @@ export function uptimeTier(percent: number): UptimeTier {
 export function deviceSummaries(
   records: DailyRecord[],
   sort: DeviceSort = "name",
+  deviceNames = loadDevices(),
 ): DeviceSummary[] {
   const byDevice = new Map<string, DailyRecord[]>();
-  for (const name of DEFAULT_DEVICES) {
+  for (const name of deviceNames) {
     byDevice.set(name, []);
   }
   for (const record of records) {
@@ -227,23 +242,6 @@ export function percent(value: number) {
   })}%`;
 }
 
-export function buildCsv(records: DailyRecord[]): string {
-  const escape = (cells: string[]) =>
-    cells.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",");
-  const header = ["Tanggal", "Device", "Downtime (menit)", "Uptime (menit)", "Uptime %"];
-  const rows = records.map((record) => {
-    const uptime = MINUTES_PER_DAY - record.downtimeMinutes;
-    return [
-      record.date,
-      record.device,
-      String(record.downtimeMinutes),
-      String(uptime),
-      percent((uptime / MINUTES_PER_DAY) * 100),
-    ];
-  });
-  return `\uFEFF${[escape(header), ...rows.map(escape)].join("\n")}`;
-}
-
 export function generateDummyData(): DailyRecord[] {
   const records: DailyRecord[] = [];
   const todayDate = new Date();
@@ -273,18 +271,25 @@ export function generateDummyData(): DailyRecord[] {
 
 export function buildExcelCrossTable(
   summaries: DeviceSummary[],
-  year: number,
-  month: number,
+  from: string,
+  to: string,
   filterStatus: FilterStatus,
   search: string,
 ) {
   return import("xlsx").then((XLSX) => {
     const wb = XLSX.utils.book_new();
 
-    const monthName = new Intl.DateTimeFormat("id-ID", { month: "long" }).format(new Date(year, month - 1));
+    const label = `${formatDate(from)} s/d ${formatDate(to)}`;
     const todayStr = today();
+    const start = new Date(`${from}T00:00:00`);
+    const last = new Date(`${to}T00:00:00`);
 
-    const activeDates = [...new Set(summaries.flatMap((s) => s.records.map((r) => r.date)))].sort();
+    const activeDates: string[] = [];
+    const cursor = new Date(start);
+    while (cursor <= last) {
+      activeDates.push(formatDateParts(cursor).key);
+      cursor.setDate(cursor.getDate() + 1);
+    }
 
     const headerRow1 = ["Tanggal"];
     const headerRow2: string[] = [""];
@@ -317,7 +322,8 @@ export function buildExcelCrossTable(
 
     const filterLabel = filterStatus === "downtime" ? "Ada downtime" : filterStatus === "normal" ? "Normal" : "Semua";
     const meta = [
-      [`Laporan Uptime CCTV — ${monthName} ${year}`],
+      ["Laporan Uptime CCTV"],
+      [`Periode: ${label}`],
       [`Filter: ${filterLabel}${search ? ` | Pencarian: ${search}` : ""}`],
       [`Diekspor: ${new Intl.DateTimeFormat("id-ID", { dateStyle: "full" }).format(new Date())}`],
     ];

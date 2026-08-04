@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { IconTrash } from "@tabler/icons-react";
+import { IconSearch, IconTrash } from "@tabler/icons-react";
 import { formatDuration, formatHumanDuration } from "@/lib/duration";
 import {
   formatDate,
@@ -11,6 +11,8 @@ import {
   type FilterStatus,
 } from "@/lib/reports";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 type DeviceTableProps = {
   summaries: DeviceSummary[];
@@ -20,7 +22,13 @@ type DeviceTableProps = {
   onDelete: (id: string) => void;
 };
 
-export function DeviceTable({ summaries, filterStatus, selectedDevice, onSelectedDeviceChange, onDelete }: DeviceTableProps) {
+export function DeviceTable({
+  summaries,
+  filterStatus,
+  selectedDevice,
+  onSelectedDeviceChange,
+  onDelete,
+}: DeviceTableProps) {
   const visibleSummaries = useMemo(() => {
     if (filterStatus === "downtime") return summaries.filter((s) => s.totalDowntime > 0);
     if (filterStatus === "normal") return summaries.filter((s) => s.days > 0 && s.totalDowntime === 0);
@@ -40,46 +48,48 @@ export function DeviceTable({ summaries, filterStatus, selectedDevice, onSelecte
 
   return (
     <div>
-      <div className="flex items-center gap-3 border-b px-5 py-3">
-        <label className="text-xs font-medium text-muted-foreground">Pilih device:</label>
-        <input
-          type="text"
-          value={selectedDevice}
-          onChange={(event) => {
-            onSelectedDeviceChange(event.target.value);
-            setConfirmingId(null);
-          }}
-          list="device-list"
-          placeholder="Ketik atau pilih device…"
-          className="h-8 w-64 rounded-md border bg-white px-2 text-sm outline-none focus:border-primary"
-        />
-        <datalist id="device-list">
-          {visibleSummaries.map((s) => (
-            <option key={s.device} value={s.device}>
-              {s.device} {s.days > 0 ? `(${s.days} hari)` : "(belum ada data)"}
-            </option>
-          ))}
-        </datalist>
+      <div className="flex flex-wrap items-center gap-3 border-b px-5 py-3">
+        <div className="relative">
+          <IconSearch className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            value={selectedDevice}
+            onChange={(event) => {
+              onSelectedDeviceChange(event.target.value);
+              setConfirmingId(null);
+            }}
+            list="device-list"
+            placeholder="Ketik atau pilih device…"
+            className="w-64 pl-9"
+          />
+          <datalist id="device-list">
+            {visibleSummaries.map((s) => (
+              <option key={s.device} value={s.device}>
+                {s.device} {s.days > 0 ? `(${s.days} hari)` : "(belum ada data)"}
+              </option>
+            ))}
+          </datalist>
+        </div>
         {summary && summary.days > 0 && (
-          <div className="ml-auto flex items-center gap-4 text-xs">
+          <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             <span className="tabular-nums text-muted-foreground">
               {summary.days} hari
             </span>
-            <span className={cn("tabular-nums font-medium", hasDowntime ? "text-red-600" : "text-muted-foreground")}>
+            <span
+              className={cn(
+                "tabular-nums font-medium",
+                hasDowntime ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
               Downtime: {formatHumanDuration(summary.totalDowntime)}
             </span>
-            <span className="tabular-nums font-medium text-slate-700">
+            <span className="tabular-nums font-medium text-foreground">
               Uptime: {formatHumanDuration(summary.totalUptime)}
             </span>
-            <span className="tabular-nums font-medium">
-              {percent(summary.uptimePercent)}
-            </span>
-            <span className={cn(
-              "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
-              hasDowntime ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600",
-            )}>
+            <span className="tabular-nums font-semibold">{percent(summary.uptimePercent)}</span>
+            <Badge variant={hasDowntime ? "destructive" : "ok"}>
               {hasDowntime ? "Downtime" : "Normal"}
-            </span>
+            </Badge>
           </div>
         )}
       </div>
@@ -88,13 +98,13 @@ export function DeviceTable({ summaries, filterStatus, selectedDevice, onSelecte
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <th className="px-5 py-2.5 font-semibold">Tanggal</th>
-                <th className="px-4 py-2.5 font-semibold">Downtime</th>
-                <th className="px-4 py-2.5 font-semibold">Uptime</th>
-                <th className="px-4 py-2.5 font-semibold">Uptime %</th>
-                <th className="px-4 py-2.5 font-semibold">Status</th>
-                <th className="px-4 py-2.5 text-right font-semibold">Aksi</th>
+              <tr className="border-b text-left text-xs text-muted-foreground">
+                <th className="px-5 py-2.5 font-medium">Tanggal</th>
+                <th className="px-4 py-2.5 font-medium">Downtime</th>
+                <th className="px-4 py-2.5 font-medium">Uptime</th>
+                <th className="px-4 py-2.5 font-medium">Uptime %</th>
+                <th className="px-4 py-2.5 font-medium">Status</th>
+                <th className="px-4 py-2.5 text-right font-medium">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -102,20 +112,26 @@ export function DeviceTable({ summaries, filterStatus, selectedDevice, onSelecte
                 const uptime = MINUTES_PER_DAY - record.downtimeMinutes;
                 const isDown = record.downtimeMinutes > 0;
                 return (
-                  <tr key={record.id} className="border-b last:border-0 hover:bg-slate-50">
+                  <tr key={record.id} className="border-b last:border-0 hover:bg-muted/50">
                     <td className="px-5 py-2.5">{formatDate(record.date)}</td>
-                    <td className={cn("px-4 py-2.5 tabular-nums", isDown ? "font-medium text-red-600" : "text-slate-400")}>
+                    <td
+                      className={cn(
+                        "px-4 py-2.5 tabular-nums",
+                        isDown ? "font-medium text-destructive" : "text-muted-foreground",
+                      )}
+                    >
                       {formatDuration(record.downtimeMinutes)}
                     </td>
-                    <td className="px-4 py-2.5 tabular-nums font-medium text-slate-700">{formatDuration(uptime)}</td>
-                    <td className="px-4 py-2.5 tabular-nums font-medium">{percent((uptime / MINUTES_PER_DAY) * 100)}</td>
+                    <td className="px-4 py-2.5 tabular-nums font-medium text-foreground">
+                      {formatDuration(uptime)}
+                    </td>
+                    <td className="px-4 py-2.5 tabular-nums">
+                      {percent((uptime / MINUTES_PER_DAY) * 100)}
+                    </td>
                     <td className="px-4 py-2.5">
-                      <span className={cn(
-                        "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
-                        isDown ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600",
-                      )}>
+                      <Badge variant={isDown ? "destructive" : "ok"}>
                         {isDown ? "Down" : "OK"}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       {confirmingId === record.id ? (
@@ -124,15 +140,15 @@ export function DeviceTable({ summaries, filterStatus, selectedDevice, onSelecte
                             onDelete(record.id);
                             setConfirmingId(null);
                           }}
-                          className="rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                          className="rounded px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
                         >
                           Hapus?
                         </button>
                       ) : (
                         <button
                           onClick={() => setConfirmingId(record.id)}
-                          title="Hapus"
-                          className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          aria-label="Hapus"
+                          className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         >
                           <IconTrash className="size-4" />
                         </button>
@@ -146,7 +162,7 @@ export function DeviceTable({ summaries, filterStatus, selectedDevice, onSelecte
         </div>
       ) : (
         <div className="px-5 py-10 text-center text-sm text-muted-foreground">
-          Belum ada data untuk device ini.
+          Pilih device di atas untuk melihat rinciannya.
         </div>
       )}
     </div>
