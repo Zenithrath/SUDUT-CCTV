@@ -1,0 +1,2 @@
+import { LinkButton } from "@/components/ui/button";
+export default function NotFound() { return <main className="grid min-h-screen place-items-center p-6"><section className="max-w-md text-center"><p className="text-7xl font-semibold text-primary">404</p><h1 className="mt-4 text-2xl font-semibold">Halaman tidak ditemukan</h1><p className="mt-2 text-muted-foreground">Alamat yang Anda buka tidak tersedia di SUDUT CCTV.</p><LinkButton className="mt-6" href="/dashboard">Kembali ke dashboard</LinkButton></section></main>; }

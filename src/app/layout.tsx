@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SUDUT CCTV | Monitoring Uptime",
-  description: "Sistem pelaporan uptime dan downtime CCTV.",
+  title: "SUDUT CCTV | Laporan Harian",
+  description: "Laporan uptime dan downtime CCTV harian.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

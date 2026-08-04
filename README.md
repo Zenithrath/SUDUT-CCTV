@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SUDUT CCTV
 
-## Getting Started
+Aplikasi sederhana untuk mencatat laporan CCTV harian.
 
-First, run the development server:
+Alurnya hanya tiga langkah:
+
+1. Pilih atau tulis nama device CCTV dan tanggal.
+2. Masukkan lama downtime dalam jam dan menit.
+3. Simpan; tabel otomatis menghitung uptime, downtime, dan persentasenya.
+
+## Fitur
+
+- Input device, tanggal, serta downtime `jam:menit`.
+- Uptime dihitung otomatis dari 24 jam dikurangi downtime.
+- Ringkasan per device: total uptime, total downtime, rata-rata per hari, persentase, dan status.
+- Klik baris device untuk melihat rincian laporan hariannya, termasuk hapus laporan.
+- Filter berdasarkan nama device, rentang tanggal, dan status; urutkan per nama atau downtime terbesar.
+- Ekspor data ke CSV.
+- Jika device dan tanggal yang sama dimasukkan lagi, laporan sebelumnya diperbarui.
+- Data disimpan di local storage browser sehingga langsung bisa digunakan tanpa konfigurasi database.
+
+## Menjalankan aplikasi
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Perintah verifikasi
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
 
-## Learn More
+## Catatan data
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Versi ini sengaja ringan. Data tersimpan pada browser yang digunakan. Jika nantinya laporan perlu dipakai bersama oleh beberapa operator, aplikasi dapat dihubungkan ke database tanpa mengubah alur inputnya.
