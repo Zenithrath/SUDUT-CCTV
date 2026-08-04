@@ -40,7 +40,14 @@ import {
   type DeviceSort,
   type FilterStatus,
 } from "@/lib/reports";
-import { DEVICES_STORAGE_KEY, loadDevices } from "@/lib/devices";
+import {
+  DEFAULT_DEVICE_AREA,
+  DEVICE_AREAS_STORAGE_KEY,
+  DEVICES_STORAGE_KEY,
+  loadDeviceAreas,
+  loadDevices,
+  saveDeviceArea,
+} from "@/lib/devices";
 import { cn } from "@/lib/utils";
 
 function fmt(date: Date) {
@@ -75,6 +82,7 @@ export function DailyReportWorkspace() {
   const [records, setRecords] = useState<DailyRecord[]>([]);
   const [storageReady, setStorageReady] = useState(false);
   const [storedDevices, setStoredDevices] = useState<string[]>([]);
+  const [deviceAreas, setDeviceAreas] = useState<Record<string, string>>({});
 
   const now = new Date();
   const todayStr = today();
@@ -86,6 +94,8 @@ export function DailyReportWorkspace() {
 
   const [device, setDevice] = useState("");
   const [newDevice, setNewDevice] = useState("");
+  const [area, setArea] = useState(DEFAULT_DEVICE_AREA);
+  const [newArea, setNewArea] = useState("");
   const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [date, setDate] = useState(today());
   const [toDate, setToDate] = useState("");
@@ -94,6 +104,7 @@ export function DailyReportWorkspace() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
+  const [tableArea, setTableArea] = useState("all");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [sortBy, setSortBy] = useState<DeviceSort>("name");
   const [viewMode, setViewMode] = useState<"cross" | "summary">("cross");
@@ -105,6 +116,7 @@ export function DailyReportWorkspace() {
     const timer = window.setTimeout(() => {
       setRecords(safeRecords(window.localStorage.getItem(STORAGE_KEY)));
       setStoredDevices(loadDevices());
+      setDeviceAreas(loadDeviceAreas());
       setStorageReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -118,6 +130,7 @@ export function DailyReportWorkspace() {
       if (event.storageArea !== window.localStorage) return;
       if (event.key === STORAGE_KEY) setRecords(safeRecords(event.newValue));
       if (event.key === DEVICES_STORAGE_KEY) setStoredDevices(loadDevices());
+      if (event.key === DEVICE_AREAS_STORAGE_KEY) setDeviceAreas(loadDeviceAreas());
     }
 
     window.addEventListener("storage", syncFromAnotherTab);
@@ -129,6 +142,17 @@ export function DailyReportWorkspace() {
       [...new Set([...storedDevices, ...records.map((record) => record.device)])]
         .sort((a, b) => a.localeCompare(b, "id")),
     [records, storedDevices],
+  );
+  const areas = useMemo(
+    () =>
+      [...new Set([DEFAULT_DEVICE_AREA, ...Object.values(deviceAreas)])]
+        .sort((a, b) => a.localeCompare(b, "id")),
+    [deviceAreas],
+  );
+  const selectedArea = area === "__new" ? newArea.trim() : area;
+  const devicesInArea = useMemo(
+    () => devices.filter((name) => (deviceAreas[name.toLowerCase()] ?? DEFAULT_DEVICE_AREA) === selectedArea),
+    [deviceAreas, devices, selectedArea],
   );
 
   const weeks = useMemo(
@@ -152,19 +176,39 @@ export function DailyReportWorkspace() {
     () => backfillDateRange(records, range.from, range.to),
     [records, range.from, range.to],
   );
+  const scopedBackfilled = useMemo(
+    () =>
+      tableArea === "all"
+        ? backfilled
+        : backfilled.filter(
+            (record) =>
+              (deviceAreas[record.device.toLowerCase()] ?? DEFAULT_DEVICE_AREA) === tableArea,
+          ),
+    [backfilled, deviceAreas, tableArea],
+  );
+  const tableDevices = useMemo(
+    () =>
+      tableArea === "all"
+        ? devices
+        : devices.filter(
+            (name) =>
+              (deviceAreas[name.toLowerCase()] ?? DEFAULT_DEVICE_AREA) === tableArea,
+          ),
+    [deviceAreas, devices, tableArea],
+  );
   const filtered = useMemo(
     () =>
-      filterRecords(backfilled, {
+      filterRecords(scopedBackfilled, {
         device: search,
         from: range.from,
         to: range.to,
         status: filterStatus,
       }),
-    [backfilled, range.from, range.to, search, filterStatus],
+    [scopedBackfilled, range.from, range.to, search, filterStatus],
   );
   const summaries = useMemo(
-    () => deviceSummaries(filtered, sortBy, devices),
-    [filtered, sortBy, devices],
+    () => deviceSummaries(filtered, sortBy, tableDevices),
+    [filtered, sortBy, tableDevices],
   );
   const visibleSummaries = useMemo(() => {
     let result = summaries;
@@ -190,6 +234,8 @@ export function DailyReportWorkspace() {
   function resetForm() {
     setDevice("");
     setNewDevice("");
+    setArea(DEFAULT_DEVICE_AREA);
+    setNewArea("");
     setDateMode("single");
     setDate(today());
     setToDate("");
@@ -201,9 +247,10 @@ export function DailyReportWorkspace() {
   function clearFilters() {
     setSearch("");
     setFilterStatus("all");
+    setTableArea("all");
   }
 
-  const filtersActive = Boolean(search || filterStatus !== "all");
+  const filtersActive = Boolean(search || filterStatus !== "all" || tableArea !== "all");
 
   function focusDashboard(target: FilterStatus) {
     setViewMode("cross");
@@ -230,6 +277,11 @@ export function DailyReportWorkspace() {
 
   function handleSubmit() {
     const name = finalDeviceName;
+    const selectedDeviceArea = selectedArea;
+    if (!selectedDeviceArea) {
+      setNotice("Pilih atau tulis area CCTV.");
+      return;
+    }
     if (!name) {
       setNotice("Pilih device atau tulis nama device baru.");
       return;
@@ -303,6 +355,8 @@ export function DailyReportWorkspace() {
     });
 
     if (device === "__new") {
+      saveDeviceArea(name, selectedDeviceArea);
+      setDeviceAreas(loadDeviceAreas());
       setDevice(name);
       setNewDevice("");
     }
@@ -330,13 +384,13 @@ export function DailyReportWorkspace() {
       toast.warning("Tidak ada data yang cocok untuk diekspor.");
       return;
     }
-    const XLSX = await import("xlsx");
+    const XLSX = await import("xlsx-js-style");
     try {
       let wb;
       if (viewMode === "cross") {
-        wb = await buildExcelCrossTable(visibleSummaries, range.from, range.to, filterStatus, search);
+        wb = await buildExcelCrossTable(visibleSummaries, range.from, range.to, filterStatus, search, tableArea);
       } else {
-        wb = await buildExcelPerDevice(summaries, selectedDevice, search, filterStatus);
+        wb = await buildExcelPerDevice(summaries, selectedDevice, search, filterStatus, tableArea);
       }
       XLSX.writeFile(wb, `sudut-cctv-${today()}.xlsx`);
       toast.success("File Excel berhasil diekspor.");
@@ -410,7 +464,15 @@ export function DailyReportWorkspace() {
       <div className="grid items-start gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="xl:sticky xl:top-6 xl:self-start">
           <ReportForm
-            devices={devices}
+            areas={areas}
+            area={area}
+            newArea={newArea}
+            onAreaChange={(value) => {
+              setArea(value);
+              setDevice("");
+            }}
+            onNewAreaChange={setNewArea}
+            devices={devicesInArea}
             device={device}
             newDevice={newDevice}
             onDeviceChange={setDevice}
@@ -572,6 +634,26 @@ export function DailyReportWorkspace() {
             )}
 
             <div className="flex flex-wrap items-center gap-2 border-b px-5 py-2.5">
+              <Select
+                selectedKey={tableArea}
+                onSelectionChange={(key) => {
+                  setTableArea(String(key ?? "all"));
+                  setSelectedDevice("");
+                }}
+                className="w-44"
+              >
+                <SelectTrigger size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem id="all" textValue="all">Semua area</SelectItem>
+                  {areas.map((name) => (
+                    <SelectItem key={name} id={name} textValue={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {viewMode === "cross" ? (
                 <>
                   <Input

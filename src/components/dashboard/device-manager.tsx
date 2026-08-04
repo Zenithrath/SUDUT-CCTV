@@ -6,6 +6,14 @@ import { IconDeviceCctv, IconPencil, IconPlus, IconSearch, IconTrash } from "@ta
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogDescription,
@@ -15,7 +23,16 @@ import {
 } from "@/components/ui/dialog";
 import { deviceSummaries, percent, STORAGE_KEY, type DailyRecord } from "@/lib/reports";
 import { safeRecords } from "@/lib/reports";
-import { loadDevices, saveDevices } from "@/lib/devices";
+import {
+  DEFAULT_DEVICE_AREA,
+  DEVICE_AREAS_STORAGE_KEY,
+  loadDeviceAreas,
+  loadDevices,
+  removeDeviceArea,
+  renameDeviceArea,
+  saveDeviceArea,
+  saveDevices,
+} from "@/lib/devices";
 import { formatHumanDuration } from "@/lib/duration";
 
 type DialogState =
@@ -26,15 +43,19 @@ type DialogState =
 
 export function DeviceManager() {
   const [devices, setDevices] = useState<string[]>([]);
+  const [deviceAreas, setDeviceAreas] = useState<Record<string, string>>({});
   const [records, setRecords] = useState<DailyRecord[]>([]);
   const [ready, setReady] = useState(false);
   const [query, setQuery] = useState("");
+  const [areaFilter, setAreaFilter] = useState("all");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [draft, setDraft] = useState("");
+  const [draftArea, setDraftArea] = useState(DEFAULT_DEVICE_AREA);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDevices(loadDevices());
+      setDeviceAreas(loadDeviceAreas());
       setRecords(safeRecords(window.localStorage.getItem(STORAGE_KEY)));
       setReady(true);
     }, 0);
@@ -54,6 +75,7 @@ export function DeviceManager() {
       if (event.storageArea !== window.localStorage) return;
       if (event.key === STORAGE_KEY) setRecords(safeRecords(event.newValue));
       if (event.key === "sudut-cctv-devices-v1") setDevices(loadDevices());
+      if (event.key === DEVICE_AREAS_STORAGE_KEY) setDeviceAreas(loadDeviceAreas());
     }
 
     window.addEventListener("storage", syncFromAnotherTab);
@@ -66,16 +88,28 @@ export function DeviceManager() {
   );
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return summaries.filter((s) => !q || s.device.toLowerCase().includes(q));
-  }, [summaries, query]);
+    return summaries.filter((summary) => {
+      const matchesName = !q || summary.device.toLowerCase().includes(q);
+      const area = deviceAreas[summary.device.toLowerCase()] ?? DEFAULT_DEVICE_AREA;
+      return matchesName && (areaFilter === "all" || area === areaFilter);
+    });
+  }, [summaries, query, areaFilter, deviceAreas]);
+  const areas = useMemo(
+    () =>
+      [...new Set([DEFAULT_DEVICE_AREA, ...Object.values(deviceAreas)])]
+        .sort((a, b) => a.localeCompare(b, "id")),
+    [deviceAreas],
+  );
 
   function openAdd() {
     setDraft("");
+    setDraftArea(DEFAULT_DEVICE_AREA);
     setDialog({ type: "add" });
   }
 
   function openRename(name: string) {
     setDraft(name);
+    setDraftArea(deviceAreas[name.toLowerCase()] ?? DEFAULT_DEVICE_AREA);
     setDialog({ type: "rename", name });
   }
 
@@ -94,6 +128,11 @@ export function DeviceManager() {
       toast.warning("Nama device terlalu panjang (maks. 60 karakter).");
       return;
     }
+    const area = draftArea.trim();
+    if (!area) {
+      toast.warning("Area CCTV tidak boleh kosong.");
+      return;
+    }
 
     if (dialog.type === "add") {
       const exists = devices.some((d) => d.toLowerCase() === value.toLowerCase());
@@ -102,6 +141,8 @@ export function DeviceManager() {
         return;
       }
       setDevices((current) => [...current, value]);
+      saveDeviceArea(value, area);
+      setDeviceAreas(loadDeviceAreas());
       toast.success(`Device "${value}" ditambahkan.`);
       setDialog(null);
       return;
@@ -110,6 +151,9 @@ export function DeviceManager() {
     if (dialog.type === "rename") {
       const oldName = dialog.name;
       if (oldName.toLowerCase() === value.toLowerCase()) {
+        saveDeviceArea(oldName, area);
+        setDeviceAreas(loadDeviceAreas());
+        toast.success(`Area ${oldName} diperbarui menjadi "${area}".`);
         setDialog(null);
         return;
       }
@@ -121,6 +165,8 @@ export function DeviceManager() {
         return;
       }
       setDevices((current) => current.map((d) => (d === oldName ? value : d)));
+      renameDeviceArea(oldName, value, area);
+      setDeviceAreas(loadDeviceAreas());
       setRecords((current) =>
         current.map((r) => (r.device === oldName ? { ...r, device: value } : r)),
       );
@@ -135,6 +181,8 @@ export function DeviceManager() {
     const summary = summaries.find((s) => s.device === name);
     const recordCount = summary?.days ?? 0;
     setDevices((current) => current.filter((d) => d !== name));
+    removeDeviceArea(name);
+    setDeviceAreas(loadDeviceAreas());
     setRecords((current) => current.filter((r) => r.device !== name));
     setDialog(null);
     toast.success(
@@ -164,14 +212,33 @@ export function DeviceManager() {
           <p className="text-sm text-muted-foreground">
             {filtered.length} device terdaftar
           </p>
-          <div className="relative">
-            <IconSearch className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cari device…"
-              className="w-56 pl-9"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              selectedKey={areaFilter}
+              onSelectionChange={(key) => setAreaFilter(String(key ?? "all"))}
+              className="w-44"
+            >
+              <SelectTrigger size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem id="all" textValue="all">Semua area</SelectItem>
+                {areas.map((area) => (
+                  <SelectItem key={area} id={area} textValue={area}>
+                    {area}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="relative">
+              <IconSearch className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Cari device…"
+                className="w-56 pl-9"
+              />
+            </div>
           </div>
         </div>
 
@@ -194,6 +261,7 @@ export function DeviceManager() {
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
                   <th className="px-5 py-2.5 font-medium">Device</th>
+                  <th className="px-4 py-2.5 font-medium">Area</th>
                   <th className="px-4 py-2.5 text-right font-medium">Hari data</th>
                   <th className="px-4 py-2.5 text-right font-medium">Total downtime</th>
                   <th className="px-4 py-2.5 text-right font-medium">Uptime</th>
@@ -208,6 +276,11 @@ export function DeviceManager() {
                     <tr key={summary.device} className="border-b last:border-0 hover:bg-muted/50">
                       <td className="px-5 py-2.5">
                         <span className="font-medium">{summary.device}</span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <Badge variant="outline">
+                          {deviceAreas[summary.device.toLowerCase()] ?? DEFAULT_DEVICE_AREA}
+                        </Badge>
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
                         {hasData ? summary.days : "—"}
@@ -298,6 +371,25 @@ export function DeviceManager() {
               }
             }}
           />
+          <div className="space-y-1.5">
+            <Label>Area CCTV</Label>
+            <Select
+              selectedKey={draftArea || null}
+              onSelectionChange={(key) => setDraftArea(String(key ?? DEFAULT_DEVICE_AREA))}
+              className="w-full"
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {areas.map((area) => (
+                  <SelectItem key={area} id={area} textValue={area}>
+                    {area}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(null)}>
               Batal

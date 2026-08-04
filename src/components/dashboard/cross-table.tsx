@@ -80,27 +80,27 @@ export function CrossTable({ summaries, from, to, filterStatus }: CrossTableProp
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 border-r border-b bg-muted px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
+            <th className="sticky left-0 z-10 border-r-2 border-b border-r-border bg-muted px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
               Tanggal
             </th>
             {visibleDevices.map((s) => (
               <th
                 key={s.device}
                 colSpan={2}
-                className="border-b px-3 py-2 text-center text-xs font-semibold text-foreground"
+                className="border-r-2 border-b border-r-border px-3 py-2 text-center text-xs font-semibold text-foreground"
               >
                 {s.device.replace("CCTV ", "")}
               </th>
             ))}
           </tr>
           <tr>
-            <th className="sticky left-0 z-10 border-r border-b bg-muted" />
+            <th className="sticky left-0 z-10 border-r-2 border-b border-r-border bg-muted" />
             {visibleDevices.map((s) => (
               <Fragment key={s.device}>
-                <th className="border-b border-r px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">
+                <th className="border-r border-b px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">
                   Down
                 </th>
-                <th className="border-b px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">
+                <th className="border-r-2 border-b border-r-border px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">
                   Up
                 </th>
               </Fragment>
@@ -110,7 +110,7 @@ export function CrossTable({ summaries, from, to, filterStatus }: CrossTableProp
         <tbody>
           {activeDates.map((date) => (
             <tr key={date} className="group">
-              <td className="sticky left-0 z-10 border-r border-b bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <td className="sticky left-0 z-10 border-r-2 border-b border-r-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
                 {formatShortDate(date)}
               </td>
               {visibleDevices.map((s) => {
@@ -122,7 +122,7 @@ export function CrossTable({ summaries, from, to, filterStatus }: CrossTableProp
                   <Fragment key={s.device}>
                     <td
                       className={cn(
-                        "border-b border-r px-2 py-1.5 text-center text-xs tabular-nums",
+                        "border-r border-b px-2 py-1.5 text-center text-xs tabular-nums",
                         hasData && dt > 0
                           ? "font-medium text-destructive"
                           : "text-muted-foreground/60",
@@ -132,7 +132,7 @@ export function CrossTable({ summaries, from, to, filterStatus }: CrossTableProp
                     </td>
                     <td
                       className={cn(
-                        "border-b px-2 py-1.5 text-center text-xs tabular-nums",
+                        "border-r-2 border-b border-r-border px-2 py-1.5 text-center text-xs tabular-nums",
                         hasData ? "text-foreground" : "text-muted-foreground/60",
                       )}
                     >

@@ -16,6 +16,11 @@ import {
 } from "@/components/ui/select";
 
 type ReportFormProps = {
+  areas: string[];
+  area: string;
+  newArea: string;
+  onAreaChange: (value: string) => void;
+  onNewAreaChange: (value: string) => void;
   devices: string[];
   device: string;
   newDevice: string;
@@ -43,6 +48,11 @@ type ReportFormProps = {
 const dateInputClass = "[&::-webkit-calendar-picker-indicator]:opacity-60";
 
 export function ReportForm({
+  areas,
+  area,
+  newArea,
+  onAreaChange,
+  onNewAreaChange,
   devices,
   device,
   newDevice,
@@ -67,6 +77,7 @@ export function ReportForm({
   onReset,
 }: ReportFormProps) {
   const addingNew = device === "__new";
+  const addingNewArea = area === "__new";
   const uptime = MINUTES_PER_DAY - downtimeMinutes;
   const uptimePercent = (uptime / MINUTES_PER_DAY) * 100;
 
@@ -87,6 +98,39 @@ export function ReportForm({
         }}
         noValidate
       >
+        <div className="space-y-1.5">
+          <Select
+            selectedKey={area || null}
+            onSelectionChange={(key) => onAreaChange(key ? String(key) : "")}
+            className="w-full"
+          >
+            <Label>Area CCTV</Label>
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {({ isPlaceholder, selectedText }) =>
+                  isPlaceholder ? "Pilih area…" : selectedText
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem id="__new" textValue="__new">Tambah area baru…</SelectItem>
+              {areas.map((name) => (
+                <SelectItem key={name} id={name} textValue={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {addingNewArea && (
+            <Input
+              value={newArea}
+              onChange={(event) => onNewAreaChange(event.target.value)}
+              placeholder="contoh: Kantor APS atau Head Office"
+              autoFocus
+            />
+          )}
+        </div>
+
         <div className="space-y-1.5">
           <Select
             selectedKey={device || null}
